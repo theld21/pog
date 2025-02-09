@@ -5,12 +5,10 @@ from kmk.modules.combos import Chord, Sequence
 import pog
 import customkeys
 
-keymap = []
-for l, layer in enumerate(pog.config['keymap']):
-    layerKeymap = []
-    for k, key in enumerate(layer):
-        layerKeymap.append(eval(key))
-    keymap.append(tuple(layerKeymap))
+keymap = [
+    tuple(eval(key.strip()) if key.strip() else eval("KC.TRNS") for key in layer)
+    for layer in pog.config['keymap']
+]
 
 encoderKeymap = []
 for l, layer in enumerate(pog.config['encoderKeymap']):

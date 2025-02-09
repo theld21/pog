@@ -61,6 +61,7 @@
         <input
           v-model="currentKeyCode"
           :disabled="selectedKeys.size === 0"
+          @blur="handleBlurInputKeyCode"
           type="text"
           class="input input-bordered input-sm w-full"
         />
@@ -180,4 +181,8 @@ const coordMapWarning = computed(() => {
   }
   return ''
 })
+
+const handleBlurInputKeyCode = () => {
+  currentKeyCode.value = currentKeyCode.value.trim() || "▽";
+};
 </script>
