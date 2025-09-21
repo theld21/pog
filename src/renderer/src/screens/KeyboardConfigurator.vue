@@ -24,11 +24,6 @@
         >
       </li>
       <li>
-        <router-link to="/configurator/layout-editor"
-          ><i class="mdi mdi-keyboard-variant"></i>Keyboard Layout</router-link
-        >
-      </li>
-      <li>
         <router-link to="/configurator/encoder"
           ><i class="mdi mdi-axis-z-rotate-clockwise"></i>Encoder</router-link
         >
@@ -38,31 +33,53 @@
       </li>
       <hr class="border-white border-opacity-20" />
       <li>
-        <router-link to="/configurator/info"
-          ><i class="mdi mdi-information-outline"></i>Info</router-link
-        >
+        <div class="cursor-pointer" @click="toggleSettings">
+          <p class="flex items-center text-gray-500">
+            <i
+              class="mdi mdi-cog mr-2 transition-transform duration-200"
+              :class="{ 'rotate-180': settingsOpen }"
+            ></i>
+            Settings
+          </p>
+        </div>
       </li>
-      <li>
-        <router-link to="/configurator/matrix"><i class="mdi mdi-grid"></i>Matrix</router-link>
-      </li>
-      <li>
-        <router-link to="/configurator/pins"
-          ><i class="mdi mdi-electric-switch"></i>Pins</router-link
-        >
-      </li>
-      <li>
-        <router-link to="/configurator/coordmap"
-          ><i class="mdi mdi-sort-numeric-ascending"></i>CoordMap</router-link
-        >
-      </li>
-      <li>
-        <router-link to="/configurator/raw-keymap"
-          ><i class="mdi mdi-code-brackets"></i>Raw Keymap</router-link
-        >
-      </li>
-      <li>
-        <router-link to="/configurator/firmware"><i class="mdi mdi-flash"></i>Firmware</router-link>
-      </li>
+      <transition name="slide-down">
+        <div v-show="settingsOpen">
+          <li>
+            <router-link to="/configurator/layout-editor"
+              ><i class="mdi mdi-keyboard-variant"></i>Keyboard Layout</router-link
+            >
+          </li>
+          <li>
+            <router-link to="/configurator/matrix"><i class="mdi mdi-grid"></i>Matrix</router-link>
+          </li>
+          <li>
+            <router-link to="/configurator/pins"
+              ><i class="mdi mdi-electric-switch"></i>Pins</router-link
+            >
+          </li>
+          <li>
+            <router-link to="/configurator/coordmap"
+              ><i class="mdi mdi-sort-numeric-ascending"></i>CoordMap</router-link
+            >
+          </li>
+          <li>
+            <router-link to="/configurator/raw-keymap"
+              ><i class="mdi mdi-code-brackets"></i>Raw Keymap</router-link
+            >
+          </li>
+          <li>
+            <router-link to="/configurator/firmware"
+              ><i class="mdi mdi-flash"></i>Firmware</router-link
+            >
+          </li>
+          <li>
+            <router-link to="/configurator/info"
+              ><i class="mdi mdi-information-outline"></i>Info</router-link
+            >
+          </li>
+        </div>
+      </transition>
     </ul>
     <div class="flex h-full w-full flex-col overflow-y-auto">
       <div class="z-10 flex items-center justify-between bg-base-100 py-4 shadow-xl">
@@ -98,25 +115,19 @@
       </div>
     </div>
   </div>
-
-  <LoadingOverlay
-    :is-visible="isLoading"
-    :using-serial="keyboardStore.usingSerial"
-    @done="hideLoadingOverlay"
-  />
 </template>
 
 <script lang="ts" setup>
 import { addToHistory, keyboardStore } from '../store'
 import { useRoute, useRouter } from 'vue-router'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Debug from '../components/debug.vue'
-import LoadingOverlay from '../components/LoadingOverlay.vue'
+import { saveConfigurationWithLoading } from '../helpers/saveConfigurationWrapper'
 
 const router = useRouter()
 const route = useRoute()
 const showDebug = ref(false)
-const isLoading = ref(false)
+const settingsOpen = ref(false)
 
 // nav guard
 console.log('path is', keyboardStore.path)
@@ -128,43 +139,27 @@ const toggleDebug = () => {
   showDebug.value = !showDebug.value
 }
 
+const toggleSettings = () => {
+  settingsOpen.value = !settingsOpen.value
+}
+
 const reselectKeyboard = () => {
   window.api.deselectKeyboard()
   router.push('/')
 }
 
-let fallbackTimeout: number | null = null
-
 const saveKeymap = async () => {
-  if (isLoading.value) return
   try {
-    isLoading.value = true
     keyboardStore.coordMapSetup = false
     const keyboardData = keyboardStore.serialize()
     addToHistory(keyboardStore)
     console.log(keyboardStore.coordMapSetup)
-    await window.api.saveConfiguration(
+    await saveConfigurationWithLoading(
       JSON.stringify({ pogConfig: keyboardData, serial: keyboardStore.usingSerial })
     )
-
-    // Only use parent fallback when not using serial; overlay has its own fallback when using serial
-    if (!keyboardStore.usingSerial) {
-      fallbackTimeout = setTimeout(() => {
-        if (isLoading.value) hideLoadingOverlay()
-      }, 15000) as unknown as number
-    }
   } catch (error) {
     console.error('Error saving keymap:', error)
-    hideLoadingOverlay()
   }
-}
-
-const hideLoadingOverlay = () => {
-  if (fallbackTimeout) {
-    clearTimeout(fallbackTimeout)
-    fallbackTimeout = null
-  }
-  isLoading.value = false
 }
 
 const currentRouteName = computed(() => route.matched[1]?.name)
@@ -186,14 +181,6 @@ onMounted(() => {
   title?.addEventListener('focus', () => {
     title.innerText = ''
   })
-})
-
-onUnmounted(() => {
-  if (fallbackTimeout) {
-    clearTimeout(fallbackTimeout)
-    fallbackTimeout = null
-  }
-  isLoading.value = false
 })
 
 const info = () => {
@@ -241,5 +228,28 @@ const info = () => {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Slide transition effects */
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.slide-down-enter-from {
+  max-height: 0;
+  opacity: 0;
+}
+
+.slide-down-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+
+.slide-down-enter-to,
+.slide-down-leave-from {
+  max-height: 500px;
+  opacity: 1;
 }
 </style>
